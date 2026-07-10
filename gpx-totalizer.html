@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Totals</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --ink:#1c231f;
+    --paper:#eef0e6;
+    --line:#c9cdb9;
+    --moss:#3f5c46;
+    --moss-dark:#2b4030;
+    --rust:#a15c3e;
+    --card:#f7f8f2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'JetBrains Mono', monospace;
+    min-height:100vh;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: -1px -1px;
+  }
+  .wrap{
+    max-width:640px;
+    margin:0 auto;
+    padding:32px 20px 80px;
+  }
+  header{
+    margin-bottom:28px;
+  }
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--moss);
+    font-weight:700;
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:900;
+    font-size:clamp(28px, 7vw, 40px);
+    margin:0 0 8px;
+    line-height:1.05;
+    letter-spacing:-.01em;
+  }
+  p.sub{
+    margin:0;
+    font-size:13px;
+    color:#5a6058;
+    line-height:1.5;
+  }
+
+  .drop{
+    margin-top:24px;
+    border:2px dashed var(--moss);
+    border-radius:2px;
+    background:var(--card);
+    padding:28px 18px;
+    text-align:center;
+    cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .drop.drag{
+    background:#e4ead9;
+    border-color:var(--rust);
+  }
+  .drop input{display:none;}
+  .drop-label{
+    font-weight:700;
+    font-size:14px;
+  }
+  .drop-hint{
+    font-size:11.5px;
+    color:#767c70;
+    margin-top:6px;
+  }
+
+  .panel{
+    margin-top:26px;
+    position:relative;
+    background:var(--card);
+    border:1px solid var(--ink);
+    padding:22px 18px 0;
+  }
+  /* corner crosshairs, like coordinate marks on a topo map margin */
+  .panel::before, .panel::after,
+  .panel .cross-tr, .panel .cross-br{
+    content:"";
+    position:absolute;
+    width:9px; height:9px;
+    border:1px solid var(--ink);
+    opacity:.55;
+  }
+  .panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .panel::after{ bottom:-1px; left:-1px; border-right:none; border-top:none; }
+  .cross-tr{ top:-1px; right:-1px; border-left:none; border-bottom:none; }
+  .cross-br{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+  .panel-label{
+    font-size:10px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--moss-dark);
+    font-weight:700;
+    margin-bottom:2px;
+  }
+
+  .chart-wrap{
+    margin:8px -4px 0;
+    line-height:0;
+  }
+  .chart-wrap svg{ width:100%; height:auto; display:block; }
+  .chart-empty{
+    height:120px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11.5px;
+    color:#9a9d8f;
+    letter-spacing:.04em;
+  }
+
+  .plate{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    border-top:1px solid var(--ink);
+    margin-top:2px;
+  }
+  .plate-item{
+    padding:12px 8px 16px;
+    text-align:center;
+    border-left:1px solid var(--line);
+  }
+  .plate-item:first-child{ border-left:none; }
+  .plate-item .pk{
+    font-size:9.5px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:#767c70;
+    margin-bottom:5px;
+  }
+  .plate-item .pv{
+    font-family:'Fraunces', serif;
+    font-weight:900;
+    font-size:clamp(18px, 5vw, 24px);
+    line-height:1;
+    color:var(--ink);
+  }
+  .plate-item.gain .pv{ color:var(--moss-dark); }
+  .plate-item.loss .pv{ color:var(--rust); }
+  .plate-item .pu{
+    font-size:10.5px;
+    font-weight:500;
+    color:#767c70;
+    margin-left:3px;
+  }
+  .plate-item .arrow{ font-size:11px; margin-right:2px; }
+
+  .unit-toggle{
+    margin-top:14px;
+    display:flex;
+    gap:8px;
+    font-size:11.5px;
+  }
+  .unit-toggle button{
+    flex:1;
+    padding:8px;
+    border:1px solid var(--moss);
+    background:transparent;
+    color:var(--moss-dark);
+    font-family:inherit;
+    font-weight:700;
+    letter-spacing:.05em;
+    cursor:pointer;
+    border-radius:2px;
+  }
+  .unit-toggle button.active{
+    background:var(--moss);
+    color:var(--paper);
+  }
+
+  .filelist{
+    margin-top:24px;
+  }
+  .filelist h2{
+    font-size:11px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:#5a6058;
+    margin:0 0 10px;
+    display:flex;
+    justify-content:space-between;
+  }
+  .row{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+    padding:12px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    font-size:12.5px;
+  }
+  .row:first-of-type{border-top:1px solid var(--line);}
+  .row .name{
+    font-weight:700;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    flex:1;
+  }
+  .row .figs{
+    display:flex;
+    gap:12px;
+    color:#5a6058;
+    white-space:nowrap;
+  }
+  .row .figs b{color:var(--ink);}
+  .row .rm{
+    color:var(--rust);
+    cursor:pointer;
+    font-weight:700;
+    font-size:14px;
+    line-height:1;
+    padding:2px 4px;
+  }
+  .row.err{color:var(--rust);}
+  .row.err .figs{color:var(--rust);}
+
+  .empty{
+    margin-top:24px;
+    font-size:12.5px;
+    color:#8a9084;
+    text-align:center;
+    padding:20px 0;
+  }
+
+  footer{
+    margin-top:34px;
+    font-size:11px;
+    color:#8a9084;
+    line-height:1.6;
+    border-top:1px solid var(--line);
+    padding-top:14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">GPX Track Totalizer</div>
+    <h1>Add up the miles.</h1>
+    <p class="sub">Drop in GPX files exported from Garmin Explore (or anywhere else) — distance and elevation gain get summed across all of them, right here in the browser. Nothing uploads anywhere.</p>
+  </header>
+
+  <div class="drop" id="drop">
+    <input type="file" id="fileInput" accept=".gpx" multiple>
+    <div class="drop-label">Tap to choose files, or drop them here</div>
+    <div class="drop-hint">Multiple .gpx files supported at once</div>
+  </div>
+
+  <div class="unit-toggle">
+    <button id="unitMi" class="active">Miles / Feet</button>
+    <button id="unitKm">Kilometers / Meters</button>
+  </div>
+
+  <div class="panel">
+    <span class="cross-tr"></span><span class="cross-br"></span>
+    <div class="panel-label">Elevation Profile · Combined Track</div>
+    <div class="chart-wrap" id="chartWrap">
+      <div class="chart-empty" id="chartEmpty">No elevation data to plot yet</div>
+    </div>
+    <div class="plate">
+      <div class="plate-item">
+        <div class="pk">Distance</div>
+        <div class="pv" id="totalDist">0<span class="pu">mi</span></div>
+      </div>
+      <div class="plate-item gain">
+        <div class="pk">Gain</div>
+        <div class="pv"><span class="arrow">▲</span><span id="totalElevGain">0</span><span class="pu">ft</span></div>
+      </div>
+      <div class="plate-item loss">
+        <div class="pk">Loss</div>
+        <div class="pv"><span class="arrow">▼</span><span id="totalElevLoss">0</span><span class="pu">ft</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filelist" id="filelistWrap" style="display:none">
+    <h2><span>Files</span><span id="fileCount"></span></h2>
+    <div id="rows"></div>
+  </div>
+
+  <div class="filelist" id="dailyWrap" style="display:none">
+    <h2><span>Daily Breakdown</span></h2>
+    <div id="dailyRows"></div>
+  </div>
+
+  <div class="empty" id="emptyMsg">No files loaded yet.</div>
+
+  <footer>
+    Elevation gain is summed from consecutive positive elevation changes in each track — the same basic method Garmin's own totals are built on. GPS-only elevation (no barometric altimeter) can run noisy; treat totals as close estimates, not survey-grade.
+  </footer>
+</div>
+
+<script>
+const state = { files: [] }; // {name, distKm, elevGainM, elevLossM, hasElevation, error}
+let unit = 'mi';
+
+const dropEl = document.getElementById('drop');
+const inputEl = document.getElementById('fileInput');
+const rowsEl = document.getElementById('rows');
+const filelistWrap = document.getElementById('filelistWrap');
+const dailyWrap = document.getElementById('dailyWrap');
+const dailyRowsEl = document.getElementById('dailyRows');
+const chartWrap = document.getElementById('chartWrap');
+const emptyMsg = document.getElementById('emptyMsg');
+const fileCount = document.getElementById('fileCount');
+
+document.getElementById('unitMi').onclick = () => setUnit('mi');
+document.getElementById('unitKm').onclick = () => setUnit('km');
+
+function setUnit(u){
+  unit = u;
+  document.getElementById('unitMi').classList.toggle('active', u==='mi');
+  document.getElementById('unitKm').classList.toggle('active', u==='km');
+  render();
+}
+
+dropEl.addEventListener('click', () => inputEl.click());
+dropEl.addEventListener('dragover', e => { e.preventDefault(); dropEl.classList.add('drag'); });
+dropEl.addEventListener('dragleave', () => dropEl.classList.remove('drag'));
+dropEl.addEventListener('drop', e => {
+  e.preventDefault();
+  dropEl.classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+});
+inputEl.addEventListener('change', e => handleFiles(e.target.files));
+
+function handleFiles(fileListRaw){
+  const files = Array.from(fileListRaw);
+  files.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const { distKm, elevGainM, elevLossM, pointCount, hasElevation, hasTime, daily, profile } = parseGpx(ev.target.result);
+        state.files.push({ name: f.name, distKm, elevGainM, elevLossM, pointCount, hasElevation, hasTime, daily, profile, error: null });
+      } catch(err) {
+        state.files.push({ name: f.name, distKm: 0, elevGainM: 0, elevLossM: 0, daily: {}, profile: null, error: err.message || 'Could not parse' });
+      }
+      render();
+    };
+    reader.onerror = () => {
+      state.files.push({ name: f.name, distKm: 0, elevGainM: 0, elevLossM: 0, daily: {}, profile: null, error: 'Could not read file' });
+      render();
+    };
+    reader.readAsText(f);
+  });
+}
+
+// Regex-based extraction: sidesteps browser XML-namespace quirks with
+// getElementsByTagName, which is the likely cause of prior parse failures.
+function extractPoints(text, tagName){
+  // matches both <trkpt ...>...</trkpt> and self-closed <trkpt .../>,
+  // tolerating an optional namespace prefix like <ns:trkpt>
+  const re = new RegExp('<(?:\\w+:)?' + tagName + '\\b([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/(?:\\w+:)?' + tagName + '>)', 'gi');
+  const pts = [];
+  let m;
+  while ((m = re.exec(text)) !== null){
+    const attrs = m[1] || '';
+    const inner = m[2] || '';
+    const latM = attrs.match(/lat\s*=\s*"([^"]+)"/i) || attrs.match(/lat\s*=\s*'([^']+)'/i);
+    const lonM = attrs.match(/lon\s*=\s*"([^"]+)"/i) || attrs.match(/lon\s*=\s*'([^']+)'/i);
+    if (!latM || !lonM) continue;
+    const lat = parseFloat(latM[1]);
+    const lon = parseFloat(lonM[1]);
+    if (!isFinite(lat) || !isFinite(lon)) continue;
+    const eleM = inner.match(/<(?:\w+:)?ele>\s*([-\d.eE]+)\s*<\/(?:\w+:)?ele>/i);
+    const ele = eleM ? parseFloat(eleM[1]) : null;
+    const timeM = inner.match(/<(?:\w+:)?time>\s*([^<]+?)\s*<\/(?:\w+:)?time>/i);
+    // ISO 8601 timestamps start with YYYY-MM-DD; grab that directly rather than
+    // constructing a Date object, since track times are effectively always UTC (Z)
+    // and we just need a calendar-day bucket, not a precise local time.
+    const dateStr = timeM && /^\d{4}-\d{2}-\d{2}/.test(timeM[1]) ? timeM[1].slice(0, 10) : null;
+    pts.push({ lat, lon, ele: (ele != null && isFinite(ele)) ? ele : null, date: dateStr });
+  }
+  return pts;
+}
+
+function parseGpx(text){
+  if (!text || !/<gpx[\s>]/i.test(text)) throw new Error('Not a GPX file');
+
+  let coords = extractPoints(text, 'trkpt');
+  if (coords.length < 2) coords = extractPoints(text, 'rtept');
+  if (coords.length < 2) coords = extractPoints(text, 'wpt');
+  if (coords.length < 2) throw new Error('No track points found in file');
+
+  const eleValues = coords.map(c => c.ele);
+  const haveElevation = eleValues.some(v => v != null);
+  const smoothed = haveElevation ? smoothElevations(eleValues) : null;
+  const haveTime = coords.some(c => c.date != null);
+
+  let distKm = 0, elevGainM = 0, elevLossM = 0;
+  const daily = {}; // date -> {distKm, gainM, lossM}
+  const cumDist = new Array(coords.length).fill(0); // cumulative km at each point index
+
+  function bucket(date){
+    const key = date || 'Unknown day';
+    if (!daily[key]) daily[key] = { distKm: 0, gainM: 0, lossM: 0 };
+    return daily[key];
+  }
+
+  for (let i=1; i<coords.length; i++){
+    const segDistKm = haversineKm(coords[i-1], coords[i]);
+    distKm += segDistKm;
+    cumDist[i] = distKm;
+
+    let segGain = 0, segLoss = 0;
+    if (smoothed && smoothed[i] != null && smoothed[i-1] != null){
+      const d = smoothed[i] - smoothed[i-1];
+      if (d > 0) { segGain = d; elevGainM += d; }
+      else { segLoss = -d; elevLossM += -d; }
+    }
+
+    // attribute this segment to the day of its arrival point
+    const b = bucket(coords[i].date);
+    b.distKm += segDistKm;
+    b.gainM += segGain;
+    b.lossM += segLoss;
+  }
+
+  // downsample to a manageable number of points for the SVG profile chart
+  let profile = null;
+  if (haveElevation){
+    const maxPoints = 120;
+    const step = Math.max(1, Math.floor(coords.length / maxPoints));
+    profile = [];
+    for (let i=0; i<coords.length; i += step){
+      if (smoothed[i] != null) profile.push({ d: cumDist[i], e: smoothed[i] });
+    }
+    // always include the final point so the chart reaches the true end
+    const last = coords.length - 1;
+    if (smoothed[last] != null && (profile.length === 0 || profile[profile.length-1].d !== cumDist[last])){
+      profile.push({ d: cumDist[last], e: smoothed[last] });
+    }
+  }
+
+  return { distKm, elevGainM, elevLossM, pointCount: coords.length, hasElevation: haveElevation, hasTime: haveTime, daily, profile };
+}
+
+// simple moving-average smoothing to reduce GPS altitude noise before summing gain
+function smoothElevations(arr){
+  const window = 5;
+  const out = new Array(arr.length).fill(null);
+  for (let i=0; i<arr.length; i++){
+    const start = Math.max(0, i - Math.floor(window/2));
+    const end = Math.min(arr.length, i + Math.floor(window/2) + 1);
+    const slice = arr.slice(start, end).filter(v => v != null);
+    if (slice.length) out[i] = slice.reduce((a,b)=>a+b,0) / slice.length;
+  }
+  return out;
+}
+
+function haversineKm(a, b){
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1-h));
+}
+function toRad(d){ return d * Math.PI / 180; }
+
+function escapeHtml(str){
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function render(){
+  const valid = state.files.filter(f => !f.error);
+  const totalDistKm = valid.reduce((s,f)=>s+f.distKm, 0);
+  const totalGainM = valid.reduce((s,f)=>s+f.elevGainM, 0);
+  const totalLossM = valid.reduce((s,f)=>s+f.elevLossM, 0);
+
+  const distVal = unit === 'mi' ? totalDistKm * 0.621371 : totalDistKm;
+  const gainVal = unit === 'mi' ? totalGainM * 3.28084 : totalGainM;
+  const lossVal = unit === 'mi' ? totalLossM * 3.28084 : totalLossM;
+  const distUnit = unit === 'mi' ? 'mi' : 'km';
+  const elevUnit = unit === 'mi' ? 'ft' : 'm';
+
+  document.getElementById('totalDist').innerHTML = distVal.toFixed(1) + '<span class="pu">'+distUnit+'</span>';
+  document.getElementById('totalElevGain').textContent = Math.round(gainVal).toLocaleString();
+  document.getElementById('totalElevLoss').textContent = Math.round(lossVal).toLocaleString();
+  // unit labels next to gain/loss numbers live in separate spans in the markup
+  document.querySelectorAll('.plate-item.gain .pu, .plate-item.loss .pu').forEach(el => el.textContent = elevUnit);
+
+  if (state.files.length === 0){
+    filelistWrap.style.display = 'none';
+    dailyWrap.style.display = 'none';
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  filelistWrap.style.display = 'block';
+  fileCount.textContent = state.files.length + (state.files.length===1 ? ' file' : ' files');
+
+  rowsEl.innerHTML = '';
+  state.files.forEach((f, idx) => {
+    const row = document.createElement('div');
+    row.className = 'row' + (f.error ? ' err' : '');
+    if (f.error){
+      row.innerHTML = `<div class="name">${escapeHtml(f.name)}</div><div class="figs">${f.error}</div><div class="rm" data-idx="${idx}">✕</div>`;
+    } else {
+      const d = unit === 'mi' ? (f.distKm*0.621371).toFixed(1)+' mi' : f.distKm.toFixed(1)+' km';
+      let gainStr, lossStr;
+      if (f.hasElevation){
+        gainStr = '+' + (unit === 'mi' ? Math.round(f.elevGainM*3.28084).toLocaleString()+'ft' : Math.round(f.elevGainM).toLocaleString()+'m');
+        lossStr = '-' + (unit === 'mi' ? Math.round(f.elevLossM*3.28084).toLocaleString()+'ft' : Math.round(f.elevLossM).toLocaleString()+'m');
+      } else {
+        gainStr = 'no elevation data';
+        lossStr = '';
+      }
+      row.innerHTML = `<div class="name">${escapeHtml(f.name)}</div><div class="figs"><b>${d}</b><b>${gainStr}</b>${lossStr ? '<b>'+lossStr+'</b>' : ''}</div><div class="rm" data-idx="${idx}">✕</div>`;
+    }
+    rowsEl.appendChild(row);
+  });
+
+  rowsEl.querySelectorAll('.rm').forEach(btn => {
+    btn.onclick = () => {
+      state.files.splice(parseInt(btn.dataset.idx), 1);
+      render();
+    };
+  });
+
+  renderDaily(valid, unit, distUnit, elevUnit);
+  renderChart(valid, unit, distUnit, elevUnit);
+}
+
+function renderChart(validFiles, unit, distUnit, elevUnit){
+  const filesWithProfile = validFiles.filter(f => f.profile && f.profile.length >= 2);
+  if (filesWithProfile.length === 0){
+    chartWrap.innerHTML = '<div class="chart-empty">No elevation data to plot yet</div>';
+    return;
+  }
+
+  // concatenate each file's profile, offsetting distance by the running total
+  // so multiple tracks read left-to-right as one continuous journey
+  let offset = 0;
+  const combined = [];
+  filesWithProfile.forEach(f => {
+    f.profile.forEach(p => combined.push({ d: p.d + offset, e: p.e }));
+    offset += f.profile[f.profile.length - 1].d;
+  });
+  if (combined.length < 2){
+    chartWrap.innerHTML = '<div class="chart-empty">Not enough data to plot</div>';
+    return;
+  }
+
+  const totalD = combined[combined.length - 1].d;
+  const elevs = combined.map(p => p.e);
+  const minE = Math.min(...elevs);
+  const maxE = Math.max(...elevs);
+  const eRange = (maxE - minE) || 1;
+
+  const W = 600, H = 170;
+  const padX = 4, padTop = 14, padBottom = 14;
+  const plotW = W - padX * 2;
+  const plotH = H - padTop - padBottom;
+  const baseline = padTop + plotH;
+
+  const X = d => padX + (totalD > 0 ? (d / totalD) * plotW : 0);
+  const Y = e => padTop + plotH - ((e - minE) / eRange) * plotH;
+
+  const pathPts = combined.map(p => `${X(p.d).toFixed(1)},${Y(p.e).toFixed(1)}`);
+  const linePath = 'M' + pathPts.join(' L');
+
+  // shade each segment by whether it climbed or descended — the color IS the data
+  let gainPolys = '', lossPolys = '';
+  for (let i = 1; i < combined.length; i++){
+    const x0 = X(combined[i-1].d).toFixed(1), y0 = Y(combined[i-1].e).toFixed(1);
+    const x1 = X(combined[i].d).toFixed(1), y1 = Y(combined[i].e).toFixed(1);
+    const poly = `${x0},${baseline} ${x0},${y0} ${x1},${y1} ${x1},${baseline}`;
+    if (combined[i].e >= combined[i-1].e){
+      gainPolys += `<polygon points="${poly}" fill="#3f5c46" opacity="0.20"/>`;
+    } else {
+      lossPolys += `<polygon points="${poly}" fill="#a15c3e" opacity="0.18"/>`;
+    }
+  }
+
+  // faint duplicate lines beneath the main path, echoing topo-map contour rings
+  const echo = offsetPx => pathPts.map(p => {
+    const [x, y] = p.split(',');
+    return `${x},${(parseFloat(y) + offsetPx).toFixed(1)}`;
+  }).join(' L');
+
+  const distDisplay = unit === 'mi' ? (totalD * 0.621371).toFixed(1) + ' ' + distUnit : totalD.toFixed(1) + ' ' + distUnit;
+  const highDisplay = unit === 'mi' ? Math.round(maxE * 3.28084).toLocaleString() + elevUnit : Math.round(maxE).toLocaleString() + elevUnit;
+  const lowDisplay = unit === 'mi' ? Math.round(minE * 3.28084).toLocaleString() + elevUnit : Math.round(minE).toLocaleString() + elevUnit;
+
+  chartWrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="${padX}" y1="${baseline}" x2="${W-padX}" y2="${baseline}" stroke="#c9cdb9" stroke-width="1"/>
+      ${gainPolys}${lossPolys}
+      <path d="M${echo(14)}" fill="none" stroke="#3f5c46" stroke-width="1" opacity="0.10"/>
+      <path d="M${echo(7)}" fill="none" stroke="#3f5c46" stroke-width="1" opacity="0.16"/>
+      <path d="${linePath}" fill="none" stroke="#1c231f" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <text x="${W-padX-2}" y="${padTop+9}" font-size="8" font-family="JetBrains Mono, monospace" fill="#767c70" text-anchor="end">${highDisplay}</text>
+      <text x="${W-padX-2}" y="${baseline-3}" font-size="8" font-family="JetBrains Mono, monospace" fill="#767c70" text-anchor="end">${lowDisplay}</text>
+      <text x="${padX+2}" y="${H-3}" font-size="8" font-family="JetBrains Mono, monospace" fill="#767c70">0</text>
+      <text x="${W-padX-2}" y="${H-3}" font-size="8" font-family="JetBrains Mono, monospace" fill="#767c70" text-anchor="end">${distDisplay}</text>
+    </svg>
+  `;
+}
+
+function renderDaily(validFiles, unit, distUnit, elevUnit){
+  // merge per-day buckets across all loaded files
+  const merged = {};
+  let anyTime = false;
+  validFiles.forEach(f => {
+    if (f.hasTime) anyTime = true;
+    Object.entries(f.daily || {}).forEach(([date, v]) => {
+      if (!merged[date]) merged[date] = { distKm: 0, gainM: 0, lossM: 0 };
+      merged[date].distKm += v.distKm;
+      merged[date].gainM += v.gainM;
+      merged[date].lossM += v.lossM;
+    });
+  });
+
+  const dates = Object.keys(merged);
+  if (dates.length === 0 || !anyTime){
+    dailyWrap.style.display = 'none';
+    return;
+  }
+  dailyWrap.style.display = 'block';
+
+  // sort chronologically, with "Unknown day" (untimed points) last
+  dates.sort((a,b) => {
+    if (a === 'Unknown day') return 1;
+    if (b === 'Unknown day') return -1;
+    return a.localeCompare(b);
+  });
+
+  dailyRowsEl.innerHTML = '';
+  dates.forEach(date => {
+    const v = merged[date];
+    const d = unit === 'mi' ? (v.distKm*0.621371).toFixed(1)+' '+distUnit : v.distKm.toFixed(1)+' '+distUnit;
+    const g = unit === 'mi' ? Math.round(v.gainM*3.28084).toLocaleString() : Math.round(v.gainM).toLocaleString();
+    const l = unit === 'mi' ? Math.round(v.lossM*3.28084).toLocaleString() : Math.round(v.lossM).toLocaleString();
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<div class="name">${escapeHtml(date)}</div><div class="figs"><b>${d}</b><b>+${g}${elevUnit}</b><b>-${l}${elevUnit}</b></div>`;
+    dailyRowsEl.appendChild(row);
+  });
+}
+
+render();
+</script>
+</body>
+</html>
